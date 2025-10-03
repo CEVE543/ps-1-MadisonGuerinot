@@ -1,16 +1,9 @@
 ---
-title: "Lab 1: Setup & Hello World"
-subtitle: "Julia Installation, GitHub Classroom Workflow, and Quarto Basics"
+title: "CEVE 543: Problem Set 1"
+subtitle: "Nonstationary Rainfall Frequency Analysis"
 author: Madison Guerinot # edit this line only
-date: 2025-08-29
-type: "lab"
-module: 1
-week: 1
-topics: ["Julia installation", "GitHub workflow", "Quarto basics"]
-objectives:
-  - "Ensure fully functional software environment"
-  - "Establish reproducible analysis workflow"
-ps_connection: "Establishes the Julia/Quarto/GitHub workflow used throughout PS1"
+date: 2025-10-06
+type: "PS"
 
 engine: julia
 julia:
@@ -48,71 +41,1125 @@ code-line-numbers: false
 code-block-font-size: "0.85em"
 ---
 
-Welcome to Lab 1! This is our first hands-on session where we'll set up and test all the essential tools you'll be using throughout the course. Think of this as building your computational toolkit - we'll install Julia, VS Code, Quarto, and GitHub tools, then create a simple but meaningful plot to make sure everything is working correctly. By the end of this lab, you'll have a fully functional development environment and will have completed your first reproducible analysis workflow. Don't worry if some of these tools are new to you - we'll walk through everything step by step, and this foundation will make all future assignments much smoother!
-
-## Before
-
-::: {.callout-important}
-## Pre-req
-
-Do this before the lab date so that lab itself can go more smoothly.
-:::
-
-This lab assumes some elementary knowledge of the command line.
-If you're a novice, the best place to learn about the command line is the [Software Carpentries Lesson on The Unix Shell](https://swcarpentry.github.io/shell-novice/).
-
-1. Install Julia, VS Code, Quarto, GitHub Desktop and the Julia / Quarto VS Code extensions following the instructions on [the textbook website](https://dossgollin-lab.github.io/climate-risk-management-reference/chapters/appendices/software.html). You can read more about installation and background on that page. Note that if you are an experienced user of other IDEs or git interfaces, VS Code and GitHub Desktop are not strictly required.
-1. Create a single folder on your computer to hold all of your CEVE 543 labs. This should be a folder on your computer that is not synced with Google Drive, Microsoft SharePoint, etc.
-1. **Create a GitHub account.** If you already have a GitHub account, you can use that for this course and do not need to create a new account.
-Otherwise, [create an account](https://github.com/join). It doesn't have to be linked to your Rice email or your NetID.
-1. **Get GitHub Copilot.** As a student, you can get GitHub Copilot for free by following the instructions at https://github.com/education/students by clicking "Join GitHub education".
-
-
-## Tasks
-
-You will do these things every time you start a new lab or problem set.
-
-1. **Open this repository in GitHub classroom.** For labs and problem sets, you should use the GitHub Classroom link posted on Canvas to "accept" the assignment, which will give you your own GitHub repository for that assignment. The first time you click one of these links, you will need to link your place on the course roster with your GitHub account.
-1. **Clone your repository** to your computer. See the instructions on the textbook website for background on what cloning is. The easiest way to clone is using GitHub Desktop.
-1. **Open the Repository in VS Code.** You can do this directly from VS Code. You can also do this from your command line.
-1. **Modify code.** You need to make two edits: (1) Replace "CEVE 543 Fall 2025" with your name in the author field at the top of the document, and (2) modify the `my_netid` variable in the code section below to use your actual NetID instead of the placeholder "jd82".
-1. **Activate and instantiate the environment.** In VS Code, open the terminal and run `julia --project=.` to start Julia with the project environment. Then run `using Pkg; Pkg.instantiate()` to install all required packages for this lab.
-1. **Preview.** In VS Code, open the Command Palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux) and run "Quarto: Preview" to preview your document in a web browser. This will show you how your document looks and execute the Julia code.
-1. **Push to GitHub.** Save your changes and commit them using GitHub Desktop or the command line (`git add .`, `git commit -m "Complete lab 1"`, `git push`). This uploads your completed work to your GitHub repository.
-1. **Pull any automated pull requests.**  This course uses [BlueStyle](https://github.com/invenia/BlueStyle) for Julia code formatting, which is automatically applied via [JuliaFormatter.jl](https://domluna.github.io/JuliaFormatter.jl/stable/). This will make your code cleaner and more readable. To avoid this, run `using JuliaFormatter; format("."; style=BlueStyle())` in the REPL. If any changes are automatically applied, `pull` them to your computer.
-1. **Render to PDF.** Once you're satisfied with your preview, render the document to PDF using "Quarto: Render PDF" from the Command Palette, or run `quarto render index.qmd --to typst` in the terminal. Typst is a modern typesetting system that creates beautiful PDFs with much faster rendering than LaTeX.
-1. **Submit PDF to Canvas.** Upload the generated PDF file to the corresponding Canvas assignment. Make sure the PDF contains your NetID and the completed plot showing the noisy sine wave measurements and true function.
-
-## Code
-
-We will create a basic plot from [the tutorial](https://docs.makie.org/dev/tutorials/getting-started).
-This will verify that your installation is running and working correctly.
+# Provided 
+## Load Required Packages
+We need to load the required Julia Packages:
+```{julia}
+lab_dir = dirname(@__FILE__)
+```
+```{julia}
+using Pkg
+Pkg.activate(lab_dir)
+# Pkg.instantiate() # uncomment this the first time you run the lab to install packages, then comment it back
+```
 
 ```{julia}
-using CairoMakie # <1>
+using CairoMakie 
 using LaTeXStrings
+using CSV
+using DataFrames
+using Dates
+using Distributions
+using Downloads
+using TidierData
+using TidierFiles
+using Unitful
+using DataFramesMeta
+using Optim
+using Extremes
+using Turing
+using ArviZ
+using Random
+using NCDatasets
+using Optim
 ```
-
-1. This is a code annotation. `using` is the keyword we say in Julia to add a package, in this case `CairoMakie`
 
 ```{julia}
-#| output: false
-my_netid = "mg221" # edit this line
-```
+# Plotting and visualization packages
+using GLMakie
+using CairoMakie
+using ColorSchemes
+using GeoMakie
+using Makie.Unitful
 
-Do not change this
+# Configure plotting backend - CairoMakie for high-quality static plots
+CairoMakie.activate!(type = "svg")
+# If you want interactive plots, uncomment the line below instead:
+# GLMakie.activate!()
+
+# Configure Unitful display preferences to use inches
+rainfall_conversion = Makie.UnitfulConversion(u"inch")
+```
 
 ```{julia}
-x = range(0, 10; length=100)
-y_true = sin.(x)
-# Add noise to create measurements
-noise = 0.2 * randn(length(x))
-y_measurements = y_true .+ noise
-
-f = Figure()
-ax = Axis(f[1, 1]; title="Plot of y = sin(x) by $(my_netid)", xlabel=L"$x$", ylabel=L"$y$")
-scatter!(ax, x, y_measurements; color=:tomato, label="Noisy measurements")
-lines!(ax, x, y_true; color=:blue, linestyle=:dash, label="True Value")
-axislegend(; position=:rb)
-f
+# Load custom utility functions
+include("util.jl")
+using Chain
 ```
+
+```{julia}
+#set seed for random number generator
+rng = MersenneTwister(543)
+```
+
+# Tasks
+## Task 1: Stationary GEV Analysis (ready after Lab 3 - Fri 9/12)
+This code is adapted from Labs 1,2 and 3.
+
+### Select one Houston-area station for primary analysis throughout tasks 1-2, 4
+I've selected station 79-055-Galveston. 
+First, Download the weather data.
+```{julia}
+fname = "dur01d_ams_na14v11.txt"
+url = "https://hdsc.nws.noaa.gov/pub/hdsc/data/tx/dur01d_ams_na14v11.txt"
+
+if !isfile(fname)
+    Downloads.download(url, fname)
+end
+```
+
+Parse the weather data into a useful format
+```{julia}
+stations, rainfall_data = read_noaa_data(fname)
+
+display(stations)
+display(rainfall_data)
+```
+
+Select Galveston data. 
+```{julia}
+my_stnid = 779
+
+my_station = @chain stations begin
+    @filter(stnid == !!my_stnid)
+    first
+end
+
+# Extract rainfall data for your chosen station
+my_precip = @chain rainfall_data begin
+    @filter(stnid == !!my_stnid)
+    @arrange(date)
+end
+
+println("Selected station: $(my_station.noaa_id) - $(my_station.name)")
+println("Years of data: $(my_station.years_of_data)")
+```
+
+
+### Extract annual maximum daily precipitation from station data (provided)
+```{julia}
+function plot_time_series(station_row, rainfall_df)
+    fig = Figure(size = (800, 400))
+    ax = Axis(fig[1, 1],
+        ylabel = "Annual Maximum 24-Hour Rainfall [inch]",
+        title = "$(station_row.noaa_id): $(station_row.name)",
+        dim2_conversion = rainfall_conversion)
+
+    lines!(ax, rainfall_df.date, rainfall_df.rainfall, color = :blue, linewidth = 2)
+    scatter!(ax, rainfall_df.date, rainfall_df.rainfall, markersize = 10, marker = :circle, strokewidth = 2, color = :transparent)
+
+    fig
+end
+ plot_time_series(my_station, my_precip)
+```
+
+### Implement MLE using maximum_likelihood from Turing.jl (see Lab 3); benchmark results against Extremes.jl for validation
+
+Define the input data (y) as the precip data from Galveston. 
+```{julia}
+y = collect(skipmissing(ustrip.(u"inch", my_precip.rainfall)))
+```
+
+Implement Extremes.jl for validation
+```{julia}
+# Fit GEV using maximum likelihood estimation (MLE)
+extremes_fit = gevfit(y)
+
+# Extract parameters 
+μ_extremes = location(extremes_fit)[1]
+σ_extremes = scale(extremes_fit)[1]
+ξ_extremes = shape(extremes_fit)[1]
+
+extremes_dist = GeneralizedExtremeValue(μ_extremes, σ_extremes, ξ_extremes)
+```
+
+Implement MLE using Turing.jl
+
+```{julia}
+using Turing
+# Define Bayesian GEV model
+@model function gev_model(y)
+    # Priors informed by data characteristics
+    μ ~ Normal(0, 10)
+    log_σ ~ Normal(0, 10)
+    ξ ~ Normal(0.0, 0.25)
+
+    σ = exp(log_σ)
+
+    y .~ GeneralizedExtremeValue(μ, σ, ξ)
+end
+
+# Fit the model using MLE
+turing_fit = maximum_likelihood(gev_model(y), NelderMead(); initial_params = [0.0, 1.0, 0.0])
+
+# Extract parameters
+μ_turing = turing_fit.values[:μ]
+σ_turing = exp(turing_fit.values[:log_σ])
+ξ_turing = turing_fit.values[:ξ]
+
+# Create distribution object
+turing_dist = GeneralizedExtremeValue(μ_turing, σ_turing, ξ_turing)
+
+```
+
+Compare the paramters of both. 
+```{julia}
+# Display parameters in a DataFrame
+params = DataFrame(
+    Parameter = ["Turing Location (μ)", "Extremes Location (μ)", "Turing Scale (σ)", "Extremes Scale (σ)", "Turing Shape (ξ)", "Extremes Shape (ξ)"],
+    Value = [round(μ_turing, digits = 7), round(μ_extremes, digits = 7), round(σ_turing, digits = 7), round(σ_extremes, digits = 7), 
+    round(ξ_turing, digits = 7), round(ξ_extremes, digits = 7)],
+)
+
+println("GEV parameters:")
+params
+```
+The parameters of Turing and Extremes are nearly the same. 
+
+Compare the distribution plots. 
+
+```{julia}
+# Compare return levels
+return_periods = [5, 10, 25, 50, 100]
+return_levels_comparison = DataFrame(
+    T_years = return_periods,
+    Extremes_MLE = [round(quantile(extremes_dist, 1 - 1 / T), digits = 2) for T in return_periods],
+    Turing_MLE = [round(quantile(turing_dist, 1 - 1 / T), digits = 2) for T in return_periods],
+)
+return_levels_comparison
+
+function plot_gev_comparison(station_data, extremes_dist, turing_dist, station_info)
+    fig = Figure()
+    ax = Axis(fig[1, 1],
+        xlabel = "Return Period (years)",
+        ylabel = "Return Level (inches)",
+        title = "GEV Fit Comparison\n$(station_info.noaa_id): $(station_info.name)",
+        xscale = log10)
+
+    # Plot theoretical curves
+    T_smooth = create_return_period_range(1.1, 250, 100)
+
+    # Extremes.jl MLE curve
+    levels_extremes = [quantile(extremes_dist, 1 - 1 / T) for T in T_smooth]
+    lines!(ax, T_smooth, levels_extremes, color = :blue, linewidth = 2, label = "Extremes MLE")
+
+    # Turing.jl curve  
+    levels_turing = [quantile(turing_dist, 1 - 1 / T) for T in T_smooth]
+    lines!(ax, T_smooth, levels_turing, color = :red, linewidth = 2, linestyle = :dash, label = "Turing MLE")
+
+    # Empirical data points
+    emp_levels, emp_periods = weibull_plotting_positions(station_data.rainfall)
+    scatter!(ax, emp_periods, emp_levels,
+        color = :black, markersize = 8, marker = :circle,
+        label = "Observed Data")
+
+    # Standard return periods
+    return_periods = [5, 10, 25, 50, 100, 250]
+    ax.xticks = return_periods
+
+    axislegend(ax, position = :rb)
+    return fig
+end
+
+plot_gev_comparison(my_precip, extremes_dist, turing_dist, my_station)
+
+```
+Extremes and Turing are nearl identical on the distribution plot. They fit the observed data fairly well, with larger changes after Return Period of 15 years. 
+
+### Implement Bayesian GEV inference using MCMC with Turing.jl; specify and justify physically-informed priors for location, scale, and shape parameters based on Houston climate knowledge.
+```{julia}
+#define function that samples from the priors only
+function load_or_sample(fname, model; overwrite=false, n_chains=4, samples_per_chain=2000, sampler=NUTS(), threading=MCMCThreads(), rng=rng)
+    idata = try
+        @assert !overwrite "Reading from cache disabled by overwrite=true"
+        idata = ArviZ.from_netcdf(fname)
+        @info "Loaded cached prior samples from $fname"
+        return idata
+    catch
+        chains = sample(
+            model,
+            sampler,
+            threading,
+            Int(ceil(samples_per_chain * n_chains)),
+            n_chains, # number of chains
+            verbose=false,
+        )
+        idata = ArviZ.from_mcmcchains(chains)
+        ArviZ.to_netcdf(idata, fname)
+        @info "Sampled and cached prior samples to $fname"
+        return idata
+    end
+end
+```
+Step 1, estimate reasonable priors based on knowledge. Instead of changing the statistic priors (location, shape, scale), I am using a predictive prior check using more intuitive return level estimates. These are based on my general knowledge of the area. Galveston recieves large amounts of rainfall due to its location on the Gulf. Using this general knowledge, I estimate the following return levels. 
+```{julia}
+
+return_level_priors = [
+    ReturnLevelPrior(2, 4.0, 1.5),
+    ReturnLevelPrior(10, 9.0, 4),
+    ReturnLevelPrior(50, 13.0, 6),
+    ReturnLevelPrior(100, 17, 8),
+]
+```
+```{julia}
+
+#Step 2, estimate priors using the return level constraints defined in Step 1. 
+@model function gev_model_quantile_priors(y; return_level_priors=[])
+
+    μ ~ Normal(3.0, 3.0)
+    log_σ ~ Normal(0.0, 1.0)
+    ξ ~ Normal(0.0, 0.3)
+    σ = exp(log_σ)
+    dist = GeneralizedExtremeValue(μ, σ, ξ)
+
+    # Apply return level constraints
+    for prior in return_level_priors
+        rl = quantile(dist, prior.quantile)
+        if rl > 0.1
+            Turing.@addlogprob!(loglikelihood(prior.distribution, rl))
+        else
+            Turing.@addlogprob!(-Inf)
+        end
+    end
+
+    # Data likelihood
+    if length(y) > 0
+        y .~ dist
+    end
+end
+
+
+#Location parameter- typical annual maximum rainfall 
+#Scale: Variability of rainfall
+#Shape: tail heaviness, estimating a heavy tail because there can be very large values in the extremes. 0.2
+```
+
+```{julia}
+#Step 3; generate samples
+prior_data = let
+    fname = joinpath(lab_dir, "prior_data.nc")
+    model = gev_model_quantile_priors([]; return_level_priors=return_level_priors)
+    overwrite = true
+    load_or_sample(fname, model; overwrite=overwrite)
+end
+prior_GEVs = vec(GeneralizedExtremeValue.(prior_data.posterior.μ, exp.(prior_data.posterior.log_σ), prior_data.posterior.ξ))
+```
+
+```{julia}
+#Step 4; Bayesian Posterior Sampling
+bayes_model = gev_model_quantile_priors(y; return_level_priors=return_level_priors)
+
+posterior_idata = let
+    fname = joinpath(lab_dir, "posterior_data.nc")
+    overwrite = true
+    load_or_sample(fname, bayes_model; overwrite=overwrite)
+end
+posterior_GEVs = vec(GeneralizedExtremeValue.(posterior_idata.posterior.μ, exp.(posterior_idata.posterior.log_σ), posterior_idata.posterior.ξ))
+```
+
+### Compare posterior distributions to MLE results and ensure convergence
+```{julia}
+# MLE
+mle_estimate = maximum_likelihood(bayes_model, NelderMead(); maxiters=1_000)
+mle_estimate.optim_result
+```
+```{julia}
+#MAP
+θ₀ = [0.0, log(1.0), 0.0]  # initial guess for [μ, log_σ, ξ]
+map_estimate = maximum_a_posteriori(bayes_model, NelderMead(); initial_params = θ₀, maxiters = 10_000, reltol = 1e-6)
+map_estimate.optim_result
+
+```
+```{julia}
+#save GEV distributions for later plotting
+mle_dist = GeneralizedExtremeValue(mle_estimate.values[1], exp(mle_estimate.values[2]), mle_estimate.values[3])
+map_dist = GeneralizedExtremeValue(map_estimate.values[1], exp(map_estimate.values[2]), map_estimate.values[3])
+```
+MLE finds the single parameter value that maximize the likelihood of observing our data. MAP finds the parameter values that maximize the posterior probability. Here, we have a single distribution for each estimate so can plot the return level. 
+```{julia}
+let
+    fig = Figure(size=(900, 500))
+    rts = logrange(1.1, 250, 500)
+    ax1 = Axis(fig[1, 1], xlabel="Return Period (years)", ylabel="Return Level (inches)",
+        title="Return Level Uncertainty: Prior vs Posterior", xscale=log10, xticks=[1, 2, 5, 10, 25, 50, 100, 250])
+    posterior_bands!(ax1, prior_GEVs, rts; color=(:blue, 0.2), ci=0.90, label="Prior 90% CI")
+    posterior_bands!(ax1, posterior_GEVs, rts; color=(:orange, 0.4), ci=0.90, label="Posterior 90% CI")
+    posterior_mean_curve!(ax1, posterior_GEVs, rts; color=:blue, linewidth=3, label="Posterior Mean")
+
+    mean_return_levels = [quantile(mle_dist, 1 - 1 / T) for T in rts]
+    lines!(ax1, rts, mean_return_levels, color=:red, linewidth=3, label="MLE")
+
+    axislegend(ax1; position=:lt)
+    fig
+end
+```
+The Posteior has much tighter confidence interval which shows how including the observational data reduces the uncertainty. 
+
+### Calculate and plot 50-year and 100-year return period estimates with posterior uncertainty bounds
+
+```{julia}
+using Distributions
+
+function gev_return_level(gev_dist::GeneralizedExtremeValue, return_period)
+    μ = gev_dist.μ
+    σ = gev_dist.σ
+    ξ = gev_dist.ξ
+
+    if abs(ξ) < 1e-6  # Gumbel case
+        return μ - σ * log(-log(1 - 1 / return_period))
+    else
+        return μ - (σ / ξ) * (1 - (-log(1 - 1 / return_period))^(-ξ))
+    end
+end
+```
+
+```{julia}
+using CairoMakie
+using Statistics
+
+# Compute 50- and 100-year return levels 
+return_levels_50 = [gev_return_level(g, 50) for g in posterior_GEVs]
+return_levels_100 = [gev_return_level(g, 100) for g in posterior_GEVs]
+
+median_50 = median(return_levels_50)
+ci_50 = quantile(return_levels_50, [0.025, 0.975])
+
+median_100 = median(return_levels_100)
+ci_100 = quantile(return_levels_100, [0.025, 0.975])
+
+fig = Figure(resolution = (900, 400))
+
+# 50-year histogram
+ax1 = Axis(fig[1, 1],
+    title = "50-Year Return Levels",
+    xlabel = "Return Level (inches)",
+    ylabel = "Frequency")
+hist!(ax1, return_levels_50, bins = 50, color = (:blue, 0.7))
+
+# Add posterior median and 95% CI lines
+vlines!(ax1, [median_50], color = :black, linewidth = 2, label = "Median")
+vlines!(ax1, ci_50, color = :black, linestyle = :dash, linewidth = 2, label = "95% CI")
+
+axislegend(ax1)
+
+# 100-year histogram
+ax2 = Axis(fig[1, 2],
+    title = "100-Year Return Levels",
+    xlabel = "Return Level (inches)",
+    ylabel = "Frequency")
+hist!(ax2, return_levels_100, bins = 50, color = (:red, 0.7))
+
+# Add posterior median and 95% CI lines
+vlines!(ax2, [median_100], color = :black, linewidth = 2, label = "Median")
+vlines!(ax2, ci_100, color = :black, linestyle = :dash, linewidth = 2, label = "95% CI")
+
+axislegend(ax2)
+
+fig
+
+```
+
+## Task 2: Multi-station Regional Analysis (ready after Lab 4)
+### Repeat Task 1 for 4 additional Houston-area stations using identical methods
+Find the 4 nearest stations to the Galeveston Station. 
+```{julia}
+# Find the 4 nearest stations to your chosen station
+nearest_stations = find_nearest_stations(my_station, stations, 4)
+
+target_lon = my_station.longitude
+target_lat = my_station.latitude
+nearest_with_distance = @chain nearest_stations begin
+    @mutate(distance_km = calc_distance(longitude, latitude, !!target_lon, !!target_lat))
+    @TidierData.select(noaa_id, name, distance_km, years_of_data)
+end
+
+println("Nearest stations to $(my_station.noaa_id):")
+display(nearest_with_distance)
+
+println("Selected station: $(my_station.noaa_id) - $(my_station.name)")
+println("Years of data: $(my_station.years_of_data)")
+```
+
+Implement MLE method using Extremes.jl for the 4 stations
+```{julia}
+# Function to fit GEV to a single station
+function fit_station_gev(station_row)
+   target_stnid = station_row.stnid
+   st_precip = rainfall_data[rainfall_data.stnid .== target_stnid, :]
+    st_precip = sort(st_precip, :date)
+
+    y_st = collect(skipmissing(ustrip.(u"inch", st_precip.rainfall)))
+
+    # Fit using Extremes.jl
+    extremes_fit_st = gevfit(y_st)
+    μ_st = location(extremes_fit_st)[1]
+    σ_st = scale(extremes_fit_st)[1]
+    ξ_st = shape(extremes_fit_st)[1]
+
+    return (
+        distribution = GeneralizedExtremeValue(μ_st, σ_st, ξ_st),
+        info = (noaa_id = station_row.noaa_id, n_years = length(y_st)),
+    )
+end
+
+# Fit all stations using map
+station_results = map(fit_station_gev, eachrow(nearest_stations))
+station_fits = [r.distribution for r in station_results]
+station_info = [r.info for r in station_results]
+```
+
+
+### Create summary table comparing 50-year return level estimates across stations 
+```{julia}
+using DataFrames, TidierData, Distributions
+
+# Build parameter + return level table
+params_df = DataFrame(
+    noaa_id = [info.noaa_id for info in station_info],
+    n_years = [info.n_years for info in station_info],
+    μ = [d.μ for d in station_fits],
+    σ = [d.σ for d in station_fits],
+    ξ = [d.ξ for d in station_fits],
+    rl_50 = [quantile(d, 1 - 1/50) for d in station_fits],   # 50-year return level
+)
+
+# Round for readability
+params_df = @chain params_df begin
+    @mutate(
+        μ = round.(μ, digits = 3),
+        σ = round.(σ, digits = 3),
+        ξ = round.(ξ, digits = 3),
+        rl_50 = round.(rl_50, digits = 3)
+    )
+end
+
+params_df
+
+```
+
+### Plot time series of all 5 stations on same axes to visualize synchonous behavior
+```{julia}
+# Compare with other nearby stations
+function plot_nearby_comparison(stations_df, rainfall_data; n_stations = 4)
+    fig = Figure(size = (800, 400))
+    ax = Axis(fig[1, 1],
+        ylabel = "Annual Maximum Rainfall",
+        title = "Comparison of $(n_stations)",
+        dim2_conversion = rainfall_conversion)
+
+    colors = [get(colorschemes[:viridis], i / n_stations) for i in 0:n_stations-1]
+
+    for (i, station) in enumerate(eachrow(stations_df[1:n_stations, :]))
+        station_id = station.stnid
+        rainfall = @chain rainfall_data begin
+            @filter(stnid == !!station_id)
+        end
+        lines!(ax, rainfall.year, rainfall.rainfall,
+            color = colors[i], linewidth = 2,
+            label = "$(station.noaa_id)")
+        scatter!(ax, rainfall.year, rainfall.rainfall,
+            color = colors[i], markersize = 10)
+    end
+    xlims!(ax, 1950, 2025)
+
+    axislegend(ax, position = :lt)
+    return fig
+end
+
+plot_nearby_comparison(stations, rainfall_data; n_stations = 4)
+```
+```{julia}
+function plot_multi_station_comparison(station_fits, station_info)
+    fig = Figure(size = (900, 600))
+    ax = Axis(fig[1, 1],
+        xlabel = "Return Period (years)",
+        ylabel = "Return Level (inches)",
+        title = "Multi-Station GEV Comparison",
+        xscale = log10)
+
+    colors = ColorSchemes.Set1_5
+    T_smooth = create_return_period_range(1.1, 250, 100)
+
+    for (i, (dist, info)) in enumerate(zip(station_fits, station_info))
+        # Plot return levels using quantile function
+        levels = [quantile(dist, 1 - 1 / T) for T in T_smooth]
+
+        lines!(ax, T_smooth, levels,
+            color = colors[i], linewidth = 2,
+            label = "$(info.noaa_id) ($(info.n_years) yrs)")
+    end
+
+    return_periods = [5, 10, 25, 50, 100]
+    ax.xticks = return_periods
+    axislegend(ax, position = :rb)
+
+    return fig
+end
+
+plot_multi_station_comparison(station_fits, station_info)
+```
+## Task 3: Nonstationarity Analysis (ready after nonstationarity lecture - Mon 9/22)
+
+### Conduct Mann-Kendall trend test on annual maxima; report test statistic, p-value, and interpretation
+```{julia}
+function mann_kendall_test(x::AbstractVector)
+    """Mann-Kendall test for monotonic trend detection."""
+    n = length(x)
+
+    # Test statistic: sum of signs of all pairwise differences
+    S = sum(sign(x[j] - x[i]) for i in 1:(n-1) for j in (i+1):n)
+
+    # For n>10, under Null Hypothesis of no trend,
+    # S is Normally distributed with mean 0 and
+    # variance V = (n/18) * (n-1) * (2n+5)
+    var_S = n * (n - 1) * (2n + 5) / 18
+
+    # Standardized test statistic with continuity correction
+    Z = if S > 0
+        (S - 1) / sqrt(var_S)
+    elseif S < 0
+        (S + 1) / sqrt(var_S)
+    else
+        0.0
+    end
+
+    # Two-tailed p-value
+    p_value = 2 * (1 - cdf(Normal(0, 1), abs(Z)))
+
+    return S, p_value
+end
+
+```
+```{julia}
+my_stnid = 779 
+
+co2_data = let
+    co2_fname = joinpath(lab_dir, "logCo2.csv")
+    TidierFiles.read_csv(co2_fname) |> DataFrame
+end
+
+my_station = @chain stations begin
+    @filter(stnid == !!my_stnid)
+    first
+end
+my_rainfall = @chain rainfall_data begin
+    @filter(stnid == !!my_stnid)
+    @arrange(date)
+    @full_join(co2_data, "year")  # Join with CO2 data
+    @arrange(year)
+end
+my_rainfall_nomissing = @chain my_rainfall begin
+    @filter(!ismissing(rainfall) && !ismissing(log_CO2))
+end
+```
+```{julia}
+prcp_obs = ustrip.(u"inch", my_rainfall_nomissing.rainfall)
+mk_S, mk_p = mann_kendall_test(prcp_obs)
+```
+
+The S value is -804 and the p value is 0.135. This shows that there is a negative trend but that trend is not statistically significant (p > 0.05). 
+
+### Repeat nonstationarity analysis for all 5 stations and create summary table comparing trend test p-values
+
+```{julia}
+let
+    stnids = nearest_stations.stnid
+    raw_results = map(stnids) do stnid
+        df = @chain rainfall_data begin
+            @filter(stnid == !!stnid)
+            @filter(!ismissing(rainfall))
+        end
+        prcp = ustrip.(u"inch", df.rainfall)
+        mk_S, mk_p = mann_kendall_test(prcp)
+        return mk_S, mk_p
+    end
+    nearest_stations[!, :mk_S] = getindex.(raw_results, 1)
+    nearest_stations[!, :mk_pvalue] = getindex.(raw_results, 2)
+end
+first(nearest_stations, 4)
+```
+
+```{julia}
+fig_trends = let
+    fig = Figure(size = (1200, 600))
+
+    # Create 1x2 layout with GeoAxis, each with colorbar to the right
+    ax1 = GeoAxis(fig[1, 1]; source = "+proj=latlong", dest = "+proj=merc",
+        title = "Mann-Kendall S Statistic", xgridvisible = false, ygridvisible = false,
+        xticksvisible = false, yticksvisible = false, xticklabelsvisible = false, yticklabelsvisible = false)
+    ax2 = GeoAxis(fig[1, 3]; source = "+proj=latlong", dest = "+proj=merc",
+        title = "Mann-Kendall p-values", xgridvisible = false, ygridvisible = false,
+        xticksvisible = false, yticksvisible = false, xticklabelsvisible = false, yticklabelsvisible = false)
+
+    # Add background layers for each axis
+    counties = GeoMakie.naturalearth("admin_2_counties_lakes", 10)
+    for ax in [ax1, ax2]
+        # Add US counties (white with gray borders)
+        poly!(ax, counties.geometry; strokecolor = :lightgray, strokewidth = 1.5, color = :white)
+    end
+
+    # Set Texas extent
+    Δ = 0.5
+    for ax in [ax1, ax2]
+        xlims!(ax, minimum(nearest_stations.longitude) - Δ, maximum(nearest_stations.longitude) + Δ)
+        ylims!(ax, minimum(nearest_stations.latitude) - Δ, maximum(nearest_stations.latitude) + Δ)
+    end
+
+    # Plot data with appropriate colormaps and individual colorbars
+    s1 = scatter!(ax1, nearest_stations.longitude, nearest_stations.latitude,
+        color = nearest_stations.mk_S, colormap = :RdBu, markersize = 18)
+    Colorbar(fig[1, 2], s1, label = "S Statistic")
+
+    s2 = scatter!(ax2, nearest_stations.longitude, nearest_stations.latitude,
+        color = nearest_stations.mk_pvalue, colormap = :viridis, markersize = 18)
+    Colorbar(fig[1, 4], s2, label = "p-value")
+
+    fig
+end
+```
+
+### Fit at least two nonstationary GEV models for your selected station
+```{julia}
+co2_data = let
+    co2_fname = joinpath(lab_dir, "logCo2.csv")
+    TidierFiles.read_csv(co2_fname) |> DataFrame
+end
+```
+```{julia}
+@model function nonstationary_gev_model1(y, x)
+    # Model 1: μ(x) = α_μ + β_μ*x where x = log(CO2)
+    μ₀ ~ Normal(3.0, 2.0)    # baseline location parameter
+    β ~ Normal(0.0, 2.0)    # location trend parameter (inches per log(ppm))
+    log_σ ~ Normal(0.0, 1.0)  # log-scale parameter
+    ξ ~ Normal(0.0, 0.3)      # shape parameter
+
+    σ = exp(log_σ)
+
+    # Location parameter varies with CO2
+    for i in eachindex(y)
+        x_centered = x[i] - log(380)  # center around ~380 ppm
+        μ_x = μ₀ + β * x_centered
+        dist = GeneralizedExtremeValue(μ_x, σ, ξ)
+        y[i] ~ dist
+    end
+end
+
+@model function nonstationary_gev_model2(y, x)
+    # Model 2: μ(x) = α_μ + β_μ*x, σ(x) = α_σ + β_σ*x
+    α_μ ~ Normal(3.0, 2.0)      # baseline location parameter
+    β_μ ~ Normal(0.0, 2.0)      # location trend parameter
+    α_σ ~ LogNormal(0.0, 1.0)   # baseline scale parameter
+    β_σ ~ Normal(0.0, 0.2)      # scale trend parameter (small prior)
+    ξ ~ Normal(0.0, 0.3)        # shape parameter
+
+    for i in eachindex(y)
+        x_centered = x[i] - log(380)
+        μ_x = α_μ + β_μ * x_centered
+        σ_x = α_σ + β_σ * x_centered
+
+        # Ensure positive scale parameter
+        if σ_x > 0.1
+            dist = GeneralizedExtremeValue(μ_x, σ_x, ξ)
+            y[i] ~ dist
+        else
+            Turing.@addlogprob!(-Inf)
+        end
+    end
+end
+
+```
+```{julia}
+my_station = @chain stations begin
+    @filter(stnid == !!my_stnid)
+    first
+end
+my_rainfall = @chain rainfall_data begin
+    @filter(stnid == !!my_stnid)
+    @arrange(date)
+    @full_join(co2_data, "year")  # Join with CO2 data
+    @arrange(year)
+end
+my_rainfall_nomissing = @chain my_rainfall begin
+    @filter(!ismissing(rainfall) && !ismissing(log_CO2))
+end
+```
+
+```{julia}
+# Prepare data
+y_obs = ustrip.(u"inch", my_rainfall_nomissing.rainfall)
+x_obs = my_rainfall_nomissing.log_CO2  # x = log(CO2)
+
+# Fit the two models
+models = [
+    ("Location trend", nonstationary_gev_model1(y_obs, x_obs)),
+    ("Location + Scale trends", nonstationary_gev_model2(y_obs, x_obs)),
+]
+
+# Sample from posteriors and check diagnostics
+posterior_results = []
+for (name, model) in models
+    try
+        fname = joinpath(lab_dir, "nonstat_$(replace(name, " " => "_")).nc")
+        overwrite = false
+        idata = load_or_sample(fname, model; overwrite=overwrite, samples_per_chain=1000)
+        push!(posterior_results, (name=name, idata=idata))
+
+        # Check diagnostics immediately after fitting
+        println("=== Diagnostics for $name ===")
+        display(ArviZ.summarize(idata))
+    catch err
+         @warn "Model $name failed" err
+    end
+
+end
+```
+
+### Justify your choice of covariate(s) and which parameters vary with the covariate(s)
+CO2 emissions are chosen as the covariate with rainfall. Warming temperatures are caused by increased CO2 emissions. In turn, the amount of water the air can store is directly related to the temperature. As temps increase, the air can hold more water, which can lead to both drought and floods. Thus, CO2 is a good covariate to choose because we expect the increasing trend to be related to changes in rainfall. It is likely that the location parameter would change because the mean of the maximum annual rainfall would change. The Scale parameter may also vary with the covariate as the variability of rainfall changes. Again, the increase in temperature can cause both droughts and floods. 
+
+### Generate return level plots showing how extreme events change over time under your models
+```{julia}
+# Model 1: Location trend only
+function extract_model1_gevs(idata, x)
+    x_centered = x - log(380)  # center around ~380 ppm
+    μ₀ = Array(idata.posterior[:μ₀])
+    β = Array(idata.posterior[:β])
+    σ = exp.(Array(idata.posterior[:log_σ]))
+    ξ = Array(idata.posterior[:ξ])
+    μ_x = μ₀ .+ β .* x_centered
+    vec(GeneralizedExtremeValue.(μ₀, σ, ξ))
+end
+
+# Model 2: Location + Scale trends
+function extract_model2_gevs(idata, x)
+    x_centered = x - log(380)
+    α_μ = Array(idata.posterior[:α_μ])
+    β_μ = Array(idata.posterior[:β_μ])
+    α_σ = Array(idata.posterior[:α_σ])
+    β_σ = Array(idata.posterior[:β_σ])
+    ξ = Array(idata.posterior[:ξ])
+    μ_x = α_μ .+ β_μ .* x_centered
+    σ_x = α_σ .+ β_σ .* x_centered
+    # Filter out negative scale parameters
+    valid = σ_x .> 0.1
+    vec(GeneralizedExtremeValue.(μ_x[valid], σ_x[valid], ξ[valid]))
+end
+```
+```{julia}
+# Extract data for each model
+model1_name, model1_idata = posterior_results[1].name, posterior_results[1].idata
+model2_name, model2_idata = posterior_results[2].name, posterior_results[2].idata
+
+# Approximate CO2 levels (x = log(CO2))
+x_1950 = co2_data.log_CO2[co2_data.year.==1950][1]  # ~310 ppm in 1950
+x_2025 = co2_data.log_CO2[co2_data.year.==2024][1]  # ~425 ppm projected for 2025
+
+# Extract GEV distributions for both time periods
+gevs_1950 = [
+    extract_model1_gevs(model1_idata, x_1950),
+    extract_model2_gevs(model2_idata, x_1950),
+]
+
+gevs_2025 = [
+    extract_model1_gevs(model1_idata, x_2025),
+    extract_model2_gevs(model2_idata, x_2025),
+]
+```
+
+```{julia}
+# Create comprehensive comparison: 1950 vs 2025 across both models
+fig_comprehensive = let
+    fig = Figure(size=(1000, 700))
+
+    rts = logrange(1.1, 250, 100)
+    xticks = [2, 5, 10, 25, 50, 100, 250]
+
+    # Top row: 1950 vs 2025 comparison for each model (adjust column widths)
+    ax1 = Axis(fig[1, 1], xlabel="Return Period (years)", ylabel="Return Level (inches)",
+        title="Location Trend Model", xscale=log10, xticks=xticks)
+    ax2 = Axis(fig[1, 2], xlabel="Return Period (years)", ylabel="Return Level (inches)",
+        title="Location + Scale Trends Model", xscale=log10, xticks=xticks)
+
+    # Make columns equal width
+    colsize!(fig.layout, 1, Relative(0.5))
+    colsize!(fig.layout, 2, Relative(0.5))
+
+    top_axes = [ax1, ax2]
+
+    for (i, (ax, gevs_50, gevs_25)) in enumerate(zip(top_axes, gevs_1950, gevs_2025))
+        posterior_bands!(ax, gevs_50, rts; ci=0.90, color=(:blue, 0.3))
+        posterior_mean_curve!(ax, gevs_50, rts; color=:blue, linewidth=2, label="1950")
+        posterior_bands!(ax, gevs_25, rts; ci=0.90, color=(:red, 0.3))
+        posterior_mean_curve!(ax, gevs_25, rts; color=:red, linewidth=2, label="2025")
+        if i == 1
+            axislegend(ax, position=:rb)
+        end
+    end
+
+    # Bottom: Direct model comparison for 2025
+    ax3 = Axis(fig[2, 1:2], xlabel="Return Period (years)", ylabel="Return Level (inches)",
+        title="Model Comparison for 2025 (Note: Models Show Similar Behavior)",
+        xscale=log10, xticks=xticks)
+
+    colors = [:blue, :red]
+    labels = ["Location Trend", "Location + Scale"]
+
+    for (i, (gevs, color, label)) in enumerate(zip(gevs_2025, colors, labels))
+        posterior_bands!(ax3, gevs, rts; ci=0.68, color=(color, 0.3))
+        posterior_mean_curve!(ax3, gevs, rts; color=color, linewidth=2, label=label)
+    end
+
+    axislegend(ax3, position=:lt)
+    linkyaxes!(top_axes...)
+
+    fig
+end
+```
+
+## Task 4:Regional Parameter Estimation
+### Choose and justify your regional model specification: which nonstationary GEV parameters should vary by station vs shared regionally
+
+Regional parameters are the trend and shape. If climate change is affecting rainfall, it should affect all nearby stations. The same logic applies to the shape. The scale and the location parameters will be set by station. The stations may have local differences in the mean and variability of rainfall. 
+
+### Define and justify your choice of regional boundaries/stations to include based on geographic proximity, climate similarity, or other criteria
+
+I will include the 10 nearest stations to the Galveston station. This will 
+
+
+### Implement your chosen regional model where some parameters are shared across stations while others remain station-specific.
+
+```{julia}
+# Find the 4 nearest stations to your chosen station
+nearest_stations = find_nearest_stations(my_station, stations, 10)
+
+target_lon = my_station.longitude
+target_lat = my_station.latitude
+nearest_with_distance = @chain nearest_stations begin
+    @mutate(distance_km = calc_distance(longitude, latitude, !!target_lon, !!target_lat))
+    @TidierData.select(noaa_id, name, distance_km, years_of_data)
+end
+
+println("Nearest stations to $(my_station.noaa_id):")
+display(nearest_with_distance)
+
+println("Selected station: $(my_station.noaa_id) - $(my_station.name)")
+println("Years of data: $(my_station.years_of_data)")
+# Combine reference station with nearest stations
+all_stations = vcat(my_station, nearest_stations)
+
+# Display the combined dataset
+println("Combined dataset including reference station and nearest stations:")
+display(all_stations)
+
+```
+```{julia}
+analysis_stations = let
+    lon = my_station.longitude
+    lat = my_station.latitude
+    @chain nearest_stations begin
+        @filter(years_of_data >= 40)
+        @mutate(distance = calc_distance(!!lat, !!lon, latitude, longitude))
+        @arrange(distance)
+        first(8)
+    end
+end
+analysis_stnids = analysis_stations.stnid
+```
+```{julia}
+years_vec, rainfall_matrix = let
+    rainfall_matrix_data = @chain rainfall_data begin
+        @filter(in(stnid, !!analysis_stnids))
+        @mutate(rainfall_inch = ifelse(ismissing(rainfall), missing, ustrip(u"inch", rainfall)))
+        @TidierData.select(year, stnid, rainfall_inch)
+        @pivot_wider(names_from = stnid, values_from = rainfall_inch)
+        @arrange(year)
+    end
+    years = rainfall_matrix_data.year
+    matrix = Matrix(rainfall_matrix_data[:, 2:end])
+    years, matrix
+end
+```
+```{julia}
+# Prepare matrices for regional model
+y_matrix, x_vector = let
+    # Get rainfall matrix: [year, station]
+    rainfall_wide = @chain rainfall_data begin
+        @filter(in(stnid, !!analysis_stnids))
+        @mutate(rainfall_inch = ustrip(u"inch", rainfall))
+        @TidierData.select(year, stnid, rainfall_inch)
+        @pivot_wider(names_from = stnid, values_from = rainfall_inch)
+        @arrange(year)
+    end
+
+    # Extract years and matrix
+    years = rainfall_wide.year
+    y_mat = Matrix(rainfall_wide[:, 2:end])  # Drop year column
+
+    # Get x vector (log CO2) for the same years
+    x_vec = @chain co2_data begin
+        @filter(in(year, !!years))
+        @arrange(year)
+        @TidierData.select(log_CO2)
+    end
+
+    y_mat, x_vec.log_CO2
+end
+```
+
+```{julia}
+@model function regional_nonstationary_gev(y_matrix, x_vector)
+
+    n_years, n_stations = size(y_matrix)
+
+    # Regional parameters (shared across all stations)
+    β_region ~ Normal(0.0, 2.0)          # Regional trend (inches per log(ppm))
+    ξ_region ~ Normal(0.0, 0.2)          # Regional shape parameter
+
+    # Station-specific parameters (independent for each station)
+    α_μ_stations ~ MvNormal(fill(3.0, n_stations), I * 2.0)  # Baseline location for each station
+    log_σ_stations ~ MvNormal(zeros(n_stations), I * 0.5)    # Scale parameter for each station
+
+    σ_stations = exp.(log_σ_stations)
+
+    # Data likelihood - loop over matrix, skip missing values
+    for i in 1:n_years
+        x_centered = x_vector[i] - log(380)  # Center x around ~380 ppm CO2
+        for j in 1:n_stations
+            if !ismissing(y_matrix[i, j])
+                μ_ij = α_μ_stations[j] + β_region * x_centered
+                dist = GeneralizedExtremeValue(μ_ij, σ_stations[j], ξ_region)
+                y_matrix[i, j] ~ dist
+            end
+        end
+    end
+end
+
+# Fit regional model with diagnostics
+regional_idata = let
+    regional_fname = joinpath(lab_dir, "regional_nonstat.nc")
+    regional_model = regional_nonstationary_gev(y_matrix, x_vector)
+    overwrite = false
+    idata = load_or_sample(regional_fname, regional_model; overwrite=overwrite, samples_per_chain=1500)
+
+    # Check diagnostics immediately after fitting
+    println("=== Regional Model Diagnostics ===")
+    display(ArviZ.summarize(idata))
+
+    idata
+end
+```
+### Compare posterior uncertainty in 50-year return levels: single-station vs regional estimates for stations with different data lengths.
+
+```{julia}
+my_stnid = 773
+my_station_idx = findfirst(x -> x == my_stnid, analysis_stnids)
+regional_my_station = let
+    # Extract regional parameters (shared)
+    β_samples = vec(Array(regional_idata.posterior[:β_region]))
+    ξ_samples = vec(Array(regional_idata.posterior[:ξ_region]))
+
+    # Extract station-specific parameters for our station
+    α_μ_samples = vec(Array(regional_idata.posterior[:α_μ_stations])[:, :, my_station_idx])
+    σ_samples = exp.(vec(Array(regional_idata.posterior[:log_σ_stations])[:, :, my_station_idx]))
+
+    (α_μ=α_μ_samples, β_μ=β_samples, σ=σ_samples, ξ=ξ_samples)
+end
+```
+```{julia}
+# Extract single-station model results (Model 1: Location trend only)
+single_station = let
+    model1_idata = posterior_results[1].idata
+    α_μ_samples = vec(Array(model1_idata.posterior[:μ₀]))
+    β_μ_samples = vec(Array(model1_idata.posterior[:β]))
+    σ_samples = exp.(vec(Array(model1_idata.posterior[:log_σ])))
+    ξ_samples = vec(Array(model1_idata.posterior[:ξ]))
+
+    (α_μ=α_μ_samples, β_μ=β_μ_samples, σ=σ_samples, ξ=ξ_samples)
+end
+```
+```{julia}
+# Prepare data for comparison plots
+rts = logrange(1.1, 250, 100)
+xticks = [2, 5, 10, 25, 50, 100, 250]
+x_2025 = co2_data.log_CO2[co2_data.year.==2024][1]
+x_centered = x_2025 - log(380)
+
+# Create GEV distributions for 2025
+μ_single_2025 = single_station.α_μ .+ single_station.β_μ .* x_centered
+gevs_single = GeneralizedExtremeValue.(μ_single_2025, single_station.σ, single_station.ξ)
+
+μ_regional_2025 = regional_my_station.α_μ .+ regional_my_station.β_μ .* x_centered
+gevs_regional = GeneralizedExtremeValue.(μ_regional_2025, regional_my_station.σ, regional_my_station.ξ)
+```
+
+```{julia}
+# Return level curves comparison
+return_level_fig = let
+    fig = Figure(size=(800, 500))
+
+    ax = Axis(fig[1, 1], xlabel="Return Period (years)", ylabel="Return Level (inches)",
+        title="2025 Return Level Comparison: Single-Station vs Regional",
+        xscale=log10, xticks=xticks)
+
+    # Plot uncertainty bands and mean curves
+    posterior_bands!(ax, gevs_single, rts; ci=0.90, color=(:blue, 0.3))
+    posterior_mean_curve!(ax, gevs_single, rts; color=:blue, linewidth=3, label="Single-Station")
+
+    posterior_bands!(ax, gevs_regional, rts; ci=0.90, color=(:red, 0.3))
+    posterior_mean_curve!(ax, gevs_regional, rts; color=:red, linewidth=3, label="Regional")
+
+    axislegend(ax, position=:rb)
+
+    fig
+end
+```
+```{julia}
+# Parameter uncertainty comparison
+parameter_uncertainty_fig = let
+    fig = Figure(size=(800, 400))
+
+    ax = Axis(fig[1, 1], xlabel="Parameter", ylabel="Posterior Standard Deviation",
+        title="Parameter Uncertainty: Single-Station vs Regional")
+
+    params = [L"$\alpha_\mu$", L"$\beta_\mu$", L"$\sigma$", L"$\xi$"]
+    single_stds = [
+        std(single_station.α_μ),
+        std(single_station.β_μ),
+        std(single_station.σ),
+        std(single_station.ξ),
+    ]
+    regional_stds = [
+        std(regional_my_station.α_μ),
+        std(regional_my_station.β_μ),
+        std(regional_my_station.σ),
+        std(regional_my_station.ξ),
+    ]
+
+    x_pos = 1:length(params)
+    barplot!(ax, x_pos .- 0.2, single_stds, width=0.35, color=:blue, alpha=0.7, label="Single-Station")
+    barplot!(ax, x_pos .+ 0.2, regional_stds, width=0.35, color=:red, alpha=0.7, label="Regional")
+
+    ax.xticks = (x_pos, params)
+    axislegend(ax, position=:rt)
+
+    fig
+end
+
+```
+
+## Task 5: Essay
+     50 years of data is a generally good length of record (assuming over 30 years of data as a rule of thumb) but 50 years will not see many truly extreme events. Using an MLE approach in this case will incorporate large uncertainties into the estimates of the extremes. Bayesian methods and regional parameter sharing can both reduce the uncertainty in estimating extremes. The plot of the Single v. Regional return level comparison shows tighter bounds in the return levels. Similarly, the plot showing the prior versus the posterior return levels shows less uncertainty for the posterior distribution. Bayesian methods inherently incorporate uncertainty into parameter estimates by generating a full posterior distribution. Regional methods can constrain parameter uncertainty by pooling the parameters across stations. Then the parameters which are not pooled do not have as much freedom, generating sharper estimates. This can be seen in the final graph which compares the posterior standard deviation between single station and regional parameters. All parameters have lower uncertainty in the regional method. 
+
+	Infrastructure is designed to have a long life span. Climate science is showing that past data may not be fully predictive of future events. Underestimating the design of infrastructure could lead to devastating consequences. Therefore, it is important to include nonstationarity into the analysis of extreme events when desiging infrastructure. We can use CO2 as a covariate with rainfall to evaluate how the return levels vary with CO2 levels. The Mann-Kendall test shows that there is nonstationarity in the data, but that looking at a single station is not representative of the region. A given station will have significant noise, so pooling data across the regions can lead to a more informative assessment. It is good to evaluate how allowing different parameters to vary affects model performance. In this case, there was very similar behavior between allowing the location and location and scale to vary. Incorporating additionl data does add complexity, but it also informs our estimates of future extreme events to ensure safe, long-lasting designs. 
+
+  
